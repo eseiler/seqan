@@ -591,6 +591,13 @@ reverse(StringSet<TSequence, TSpec> & stringSet, Tag<TParallelTag>)
         reverse(stringSet[seqNo], Serial());
 }
 
+template < typename TAlphabet, typename TAlloc, typename TSpec >
+inline void reverse(StringSet<String<TAlphabet, Packed<TAlloc> >, Owner<ConcatDirect<TSpec> > > & stringSet, Tag<Parallel>)
+{
+  // parallel reversal on ConcatDirect Packed StringSets results in undefined behaviour
+  reverse(stringSet, Serial());
+}
+
 template < typename TText >
 inline SEQAN_FUNC_DISABLE_IF(Is<StlContainerConcept<TText> >)
 reverse(TText & text)

@@ -308,6 +308,20 @@ inline void reverseComplement(StringSet<TSequence, TSpec> const & stringSet, Tag
         reverseComplement(stringSet[seqNo], Serial());
 }
 
+template < typename TAlphabet, typename TAlloc, typename TSpec >
+inline void reverseComplement(StringSet<String<TAlphabet, Packed<TAlloc> >, Owner<ConcatDirect<TSpec> > > & stringSet, Tag<Parallel>)
+{
+  // parallel reversal on ConcatDirect Packed StringSets results in undefined behaviour
+  reverseComplement(stringSet, Serial());
+}
+
+template < typename TAlphabet, typename TAlloc, typename TSpec >
+inline void reverseComplement(StringSet<String<TAlphabet, Packed<TAlloc> >, Owner<ConcatDirect<TSpec> > > const & stringSet, Tag<Parallel>)
+{
+  // parallel reversal on ConcatDirect Packed StringSets results in undefined behaviour
+  reverseComplement(stringSet, Serial());
+}
+
 template <typename TText>
 inline void reverseComplement(TText & text)
 {
