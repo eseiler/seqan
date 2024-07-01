@@ -414,8 +414,6 @@ int VariantMaterializer::_materializeLargeVariants(
         // Translate positions and lengths of SV record.
         if (verbosity >= 2)
             std::cerr << "  Translating SvRecord\n  " << svRecord << '\n';
-        svRecord.pos = hostToVirtualPosition(journal, svRecord.pos);
-        SEQAN_ASSERT_LT(svRecord.pos, (int)length(contig));
         // We do not need to adjust the sizes for insertions.
         if (svRecord.kind != StructuralVariantRecord::INDEL || svRecord.size < 0)
         {
@@ -427,6 +425,8 @@ int VariantMaterializer::_materializeLargeVariants(
             //       Variants may overlap.
             svRecord.size = (svRecord.size < 0 ? -1 : 1) * (hostToVirtualPosition(journal, svRecord.pos + std::abs(svRecord.size)) - hostToVirtualPosition(journal, svRecord.pos));
         }
+        svRecord.pos = hostToVirtualPosition(journal, svRecord.pos);
+        SEQAN_ASSERT_LT(svRecord.pos, (int)length(contig));
         if (svRecord.targetPos != -1)
             svRecord.targetPos = hostToVirtualPosition(journal, svRecord.targetPos);
         if (verbosity >= 2)
@@ -442,7 +442,7 @@ int VariantMaterializer::_materializeLargeVariants(
 
         // Copy from contig to seq with SVs.
         if (verbosity >= 3)
-            std::cerr << __LINE__ << "\tappend(seq, infix(contig, " << lastPos << ", " << svRecord.pos << ")\n";
+            std::cerr << __LINE__ << "\tappend(seq, infix(contig, " << lastPos << ", " << svRecord.pos << ") (interim)\n";
         append(seq, infix(contig, lastPos, svRecord.pos));  // interim chars
         if (methSimOptions && methSimOptions->simulateMethylationLevels)
         {
@@ -454,8 +454,6 @@ int VariantMaterializer::_materializeLargeVariants(
             appendValue(intervals, GenomicInterval(currentPos, length(seq), lastPos, svRecord.pos,
                                                    '+', GenomicInterval::NORMAL));
         currentPos = length(seq);
-        if (verbosity >= 3)
-            std::cerr << __LINE__ << "\tappend(seq, infix(contig, " << lastPos << ", " << svRecord.pos << ") (interim)\n";
         switch (svRecord.kind)
         {
             case StructuralVariantRecord::INDEL:
