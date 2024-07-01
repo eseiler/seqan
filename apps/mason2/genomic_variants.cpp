@@ -182,11 +182,11 @@ int VariantMaterializer::_runImpl(
 // ----------------------------------------------------------------------------
 
 int VariantMaterializer::_materializeSmallVariants(
-        seqan2::Dna5String & seq,
+        seqan2::Dna5String & seq, // resulting sequence, original sequence with small variants applied
         TJournalEntries & journal,
         MethylationLevels * levelsSmallVariants,
         std::vector<SmallVarInfo> & smallVarInfos,
-        seqan2::Dna5String const & contig,
+        seqan2::Dna5String const & contig, // contig == original sequence
         Variants const & variants,
         MethylationLevels const * levels,
         int hId)
@@ -235,7 +235,7 @@ int VariantMaterializer::_materializeSmallVariants(
             if (snpRecord.haplotype == hId)  // Ignore all but the current contig.
             {
                 if (verbosity >= 3)
-                    std::cerr << "append(seq, infix(contig, " << lastPos << ", " << snpRecord.pos << ") " << __LINE__ << "\n";
+                    std::cerr << __LINE__ << "\tappend(seq, infix(contig, " << lastPos << ", " << snpRecord.pos << ")\n";
                 // Append interim sequence and methylation levels->
                 append(seq, infix(contig, lastPos, snpRecord.pos));
                 if (methSimOptions && methSimOptions->simulateMethylationLevels)
@@ -248,7 +248,7 @@ int VariantMaterializer::_materializeSmallVariants(
 
                 SEQAN_ASSERT_GEQ(snpRecord.pos, lastPos);
                 if (verbosity >= 3)
-                    std::cerr << "appendValue(seq, " << snpRecord.to << "')\n";
+                    std::cerr << __LINE__ << "\tappendValue(seq, " << snpRecord.to << "')\n";
                 appendValue(seq, snpRecord.to);
                 lastPos = snpRecord.pos + 1;
                 if (verbosity >= 3)
@@ -270,8 +270,7 @@ int VariantMaterializer::_materializeSmallVariants(
                 if (smallIndelRecord.size > 0)
                 {
                     if (verbosity >= 3)
-                        std::cerr << "append(seq, infix(contig, " << lastPos << ", " << smallIndelRecord.pos << ") "
-                                  << __LINE__ << "\n";
+                        std::cerr << __LINE__ << "\tappend(seq, infix(contig, " << lastPos << ", " << smallIndelRecord.pos << ")\n";
 
                     // Simulate methylation levels for insertion.
                     MethylationLevels lvls;
@@ -292,7 +291,7 @@ int VariantMaterializer::_materializeSmallVariants(
 
                     SEQAN_ASSERT_GEQ(smallIndelRecord.pos, lastPos);
                     if (verbosity >= 3)
-                        std::cerr << "append(seq, \"" << smallIndelRecord.seq << "\") " << __LINE__ << "\n";
+                        std::cerr << __LINE__ << "\tappend(seq, \"" << smallIndelRecord.seq << "\")\n";
                     // Register insertion as small variant info.
                     for (unsigned i = 0; i < length(smallIndelRecord.seq); ++i)
                         smallVarInfos.push_back(SmallVarInfo(SmallVarInfo::INS, length(seq) + i, 1));
@@ -313,7 +312,7 @@ int VariantMaterializer::_materializeSmallVariants(
                 else  // deletion
                 {
                     if (verbosity >= 3)
-                        std::cerr << "append(seq, infix(contig, " << lastPos << ", " << smallIndelRecord.pos << ") " << __LINE__ << "\n";
+                        std::cerr << __LINE__ << "\tappend(seq, infix(contig, " << lastPos << ", " << smallIndelRecord.pos << ")\n";
                     // Append interim sequence and methylation levels->
                     append(seq, infix(contig, lastPos, smallIndelRecord.pos));  // interim chars
                     if (methSimOptions && methSimOptions->simulateMethylationLevels)
@@ -344,7 +343,7 @@ int VariantMaterializer::_materializeSmallVariants(
     }
     // Insert remaining characters.
     if (verbosity >= 3)
-        std::cerr << "append(seq, infix(contig, " << lastPos << ", " << length(contig) << ")\n";
+        std::cerr << __LINE__ << "\tappend(seq, infix(contig, " << lastPos << ", " << length(contig) << ")\n";
     append(seq, infix(contig, lastPos, length(contig)));
 
     if (methSimOptions && methSimOptions->simulateMethylationLevels)
@@ -366,13 +365,13 @@ int VariantMaterializer::_materializeSmallVariants(
 // ----------------------------------------------------------------------------
 
 int VariantMaterializer::_materializeLargeVariants(
-        seqan2::Dna5String & seq,
+        seqan2::Dna5String & seq, // final result sequence
         MethylationLevels * levelsLargeVariants,
         std::vector<SmallVarInfo> & varInfos,
         std::vector<std::pair<int, int> > & breakpoints,
         PositionMap & positionMap,
-        TJournalEntries const & journal,
-        seqan2::Dna5String const & contig,
+        TJournalEntries const & journal, // built over contig
+        seqan2::Dna5String const & contig, // sequence after applying small variants
         std::vector<SmallVarInfo> const & smallVarInfos,
         Variants const & variants,
         MethylationLevels const * levels,
@@ -419,8 +418,15 @@ int VariantMaterializer::_materializeLargeVariants(
         SEQAN_ASSERT_LT(svRecord.pos, (int)length(contig));
         // We do not need to adjust the sizes for insertions.
         if (svRecord.kind != StructuralVariantRecord::INDEL || svRecord.size < 0)
-            svRecord.size = hostToVirtualPosition(journal, svRecord.pos + svRecord.size) -
-                    hostToVirtualPosition(journal, svRecord.pos);
+        {
+            // Ternary: Keep sign of size, i.e. negative for deletions.
+            // Rest: Difference of positions (absolute value for deletion size).
+            //       hostToVirtualPosition maps the reference position to the contig position.
+            //       journal is built over contig.
+            //       contig is the sequence that already has small variants applied, e.g. small deletions are removed.
+            //       Variants may overlap.
+            svRecord.size = (svRecord.size < 0 ? -1 : 1) * (hostToVirtualPosition(journal, svRecord.pos + std::abs(svRecord.size)) - hostToVirtualPosition(journal, svRecord.pos));
+        }
         if (svRecord.targetPos != -1)
             svRecord.targetPos = hostToVirtualPosition(journal, svRecord.targetPos);
         if (verbosity >= 2)
@@ -436,7 +442,7 @@ int VariantMaterializer::_materializeLargeVariants(
 
         // Copy from contig to seq with SVs.
         if (verbosity >= 3)
-            std::cerr << "lastPos == " << lastPos << "\n";
+            std::cerr << __LINE__ << "\tappend(seq, infix(contig, " << lastPos << ", " << svRecord.pos << ")\n";
         append(seq, infix(contig, lastPos, svRecord.pos));  // interim chars
         if (methSimOptions && methSimOptions->simulateMethylationLevels)
         {
@@ -449,7 +455,7 @@ int VariantMaterializer::_materializeLargeVariants(
                                                    '+', GenomicInterval::NORMAL));
         currentPos = length(seq);
         if (verbosity >= 3)
-            std::cerr << "append(seq, infix(contig, " << lastPos << ", " << svRecord.pos << ") " << __LINE__ << " (interim)\n";
+            std::cerr << __LINE__ << "\tappend(seq, infix(contig, " << lastPos << ", " << svRecord.pos << ") (interim)\n";
         switch (svRecord.kind)
         {
             case StructuralVariantRecord::INDEL:
@@ -490,7 +496,8 @@ int VariantMaterializer::_materializeLargeVariants(
                     }
                     else  // deletion
                     {
-                        lastPos = svRecord.pos - svRecord.size;
+                        // skip forward in contig (which does not contain deletion)
+                        lastPos = svRecord.pos - svRecord.size; // svRecord.size is negative
                         SEQAN_ASSERT_LT(lastPos, (int)length(contig));
 
                         // Copy out breakpoint.
