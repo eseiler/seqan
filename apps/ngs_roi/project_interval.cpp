@@ -83,7 +83,7 @@ void IntersectBed::writeEmptyBed(seqan2::BedRecord<seqan2::Bed6> const & bedReco
 
 // Return true iff lhs and rhs overlap (both are BED or ROI records).
 template <typename TLeft, typename TRight>
-bool overlap(TLeft const & lhs, TRight const & rhs)
+inline bool overlap(TLeft const & lhs, TRight const & rhs)
 {
     return (rhs.beginPos < lhs.endPos) && (lhs.beginPos < rhs.endPos);
 }

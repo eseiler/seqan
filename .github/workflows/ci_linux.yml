@@ -26,16 +26,14 @@ defaults:
 jobs:
   build:
     runs-on: ubuntu-latest
-    name: ${{ matrix.compiler }}
+    name: ${{ matrix.compiler }} ${{ matrix.build_type }} ${{ matrix.unity_test }}
     if: github.repository_owner == 'seqan' || github.event_name == 'workflow_dispatch'
     strategy:
       fail-fast: false
       matrix:
-        compiler: ["clang-19", "clang-18", "clang-17", "gcc-14", "gcc-13", "gcc-12", "intel"]
-        include:
-          - cxx_flags: "-std=c++23"
-          - compiler: "intel"
-            cxx_flags: "-std=c++23 -fp-model=strict"
+        compiler: ["clang-19","gcc-14"]
+        build_type: ['Release', 'Debug']
+        unity_test: ['ON', 'OFF']
     container:
       image: ghcr.io/seqan/${{ matrix.compiler }}
       volumes:
@@ -53,23 +51,14 @@ jobs:
           pip install --quiet setuptools wheel
           pip install --quiet --requirement manual/requirements.txt
 
-      - name: Load ccache
-        uses: actions/cache@v4
-        with:
-          path: /home/runner/.ccache
-          key: ccache-${{ runner.os }}-${{ github.workflow }}-${{ matrix.compiler }}-${{ github.ref }}-${{ github.run_id }}
-          restore-keys: |
-            ccache-${{ runner.os }}-${{ github.workflow }}-${{ matrix.compiler }}-${{ github.ref }}
-            ccache-${{ runner.os }}-${{ github.workflow }}-${{ matrix.compiler }}
-
       - name: Configure tests
         run: |
           mkdir build && cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release \
-                   -DCMAKE_CXX_FLAGS="${{ matrix.cxx_flags }} -Wextra -Wall -pedantic -Werror" \
+          cmake .. -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+                   -DCMAKE_CXX_FLAGS="-std=c++23 -Wextra -Wall -pedantic -Werror" \
                    -DSEQAN_DISABLE_VERSION_CHECK=ON \
-                   -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-                   -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+                   -DCMAKE_UNITY_BUILD=${{ matrix.unity_test }} \
+                   -DCMAKE_UNITY_BUILD_BATCH_SIZE=10
 
       - name: Build tests
         working-directory: build

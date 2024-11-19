@@ -229,7 +229,7 @@ void ProjectSplicedRoi::pushRoi(seqan2::RoiRecord const & record)
 
 // Return true iff lhs and rhs overlap (both are BED or ROI records).
 template <typename TLeft, typename TRight>
-bool overlap(TLeft const & lhs, TRight const & rhs)
+inline bool overlap(TLeft const & lhs, TRight const & rhs)
 {
     return (rhs.beginPos < lhs.endPos) && (lhs.beginPos < rhs.endPos);
 }
