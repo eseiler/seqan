@@ -50,7 +50,7 @@ jobs:
           pip install -r manual/requirements.txt
 
       - name: Setup conda
-        uses: conda-incubator/setup-miniconda@v3
+        uses: conda-incubator/setup-miniconda@v4
         with:
           activate-environment: ""
           auto-activate-base: true
