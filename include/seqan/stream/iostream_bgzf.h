@@ -590,12 +590,16 @@ public:
                     &job.buffer[0] + (MAX_PUTBACK - putback));
 
             // wait for the end of decompression
+            int jobSize;
+            bool bgzfEofMarker;
             {
                 std::unique_lock<std::mutex> lock(job.cs);
                 job.readyEvent.wait(lock, [&job]{return job.ready.load();});
+                jobSize = job.size;
+                bgzfEofMarker = job.bgzfEofMarker;
             }
 
-            size_t size = (job.size != -1)? job.size : 0;
+            size_t size = (jobSize != -1)? jobSize : 0;
 
             // reset buffer pointers
             this->setg(
@@ -605,9 +609,9 @@ public:
 
             // The end of the bgzf file is reached, either if there was an error, or if the
             // end-of-file marker was reached, while the uncompressed block had zero size.
-            if (job.size == -1 || (job.size == 0 && job.bgzfEofMarker))
+            if (jobSize == -1 || (jobSize == 0 && bgzfEofMarker))
                 return EOF;
-            else if (job.size > 0)
+            else if (jobSize > 0)
                 return Tr::to_int_type(*this->gptr());      // return next character
 
             throw IOError("BGZF: Invalid end condition in decompression. "
@@ -716,9 +720,11 @@ public:
                     // wait for the end of decompression
                     DecompressionJob &job = jobs[currentJobId];
 
+                    int jobSize;
                     {
                         std::unique_lock<std::mutex> lock(job.cs);
                         job.readyEvent.wait(lock, [&job]{return job.ready.load();});
+                        jobSize = job.size;
                     }
 
                     SEQAN_ASSERT_EQ(job.fileOfs, (off_type)destFileOfs);
@@ -727,7 +733,7 @@ public:
                     this->setg(
                           &job.buffer[0] + MAX_PUTBACK,                     // no putback area
                           &job.buffer[0] + (MAX_PUTBACK + (ofs & 0xffff)),  // read position
-                          &job.buffer[0] + (MAX_PUTBACK + job.size));       // end of buffer
+                          &job.buffer[0] + (MAX_PUTBACK + jobSize));        // end of buffer
                     return ofs;
                 }
             }
